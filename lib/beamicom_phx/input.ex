@@ -1,0 +1,40 @@
+defmodule BeamicomPhx.Input do
+  @moduledoc """
+  Controller input boundary. Maps browser key names to NES buttons and forwards
+  the currently-held set to the emulator.
+
+  Phase 1 (server mode): the browser connects to the node running the emulator, so
+  `press/2` calls `Beamicom.NES.Runtime.set_buttons/3` locally. When no Runtime is
+  running (client mode — Phase 2 — or tests) it is a no-op.
+
+  ponytail: no node-to-node forwarding yet. When the Phase-2 client node lands,
+  the `nil`-Runtime branch forwards the press to the upstream server instead.
+  """
+
+  # Browser KeyboardEvent.key -> NES button. Letters matched case-insensitively.
+  @keymap %{
+    "arrowup" => :up,
+    "arrowdown" => :down,
+    "arrowleft" => :left,
+    "arrowright" => :right,
+    "x" => :a,
+    "z" => :b,
+    "enter" => :start,
+    "shift" => :select
+  }
+
+  @doc "The NES button for a browser key name, or nil if unmapped."
+  def button_for(key) when is_binary(key), do: Map.get(@keymap, String.downcase(key))
+
+  @doc """
+  Set controller `port` to exactly the currently-held `buttons` (a list of button
+  atoms). No-op when no local emulator Runtime is running.
+  """
+  def press(port, buttons) when is_integer(port) and is_list(buttons) do
+    if Process.whereis(Beamicom.NES.Runtime) do
+      Beamicom.NES.Runtime.set_buttons(port, buttons)
+    end
+
+    :ok
+  end
+end
