@@ -18,8 +18,18 @@ defmodule BeamicomPhxWeb.WatchLive do
       if connected?(socket) do
         signaling = Membrane.WebRTC.Signaling.new()
 
-        {:ok, _supervisor, _pipeline} =
-          Membrane.Pipeline.start_link(BeamicomPhx.AV.Pipeline, egress_signaling: signaling)
+        case Application.get_env(:beamicom_phx, :mode, :server) do
+          # Client node: attach to the shared Relay, which links a WebRTC.Sink for
+          # this browser and monitors us — it tears the sink down when we disconnect.
+          :client ->
+            BeamicomPhx.AV.Relay.add_browser(socket.id, self(), signaling)
+
+          # Server node: start this browser's own encode pipeline (Phase 1), linked
+          # to this LiveView so it dies with the socket.
+          _server ->
+            {:ok, _supervisor, _pipeline} =
+              Membrane.Pipeline.start_link(BeamicomPhx.AV.Pipeline, egress_signaling: signaling)
+        end
 
         Player.attach(socket, id: "videoPlayer", signaling: signaling)
       else
