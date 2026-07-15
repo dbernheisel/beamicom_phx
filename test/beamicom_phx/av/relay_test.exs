@@ -11,4 +11,18 @@ defmodule BeamicomPhx.AV.RelayTest do
     refute_receive {:DOWN, ^ref, :process, ^pid, _}, 1_000
     Membrane.Pipeline.terminate(pid)
   end
+
+  test "attaching a browser before the stream arrives queues without crashing" do
+    {:ok, _sup, pid} = Membrane.Pipeline.start_link(BeamicomPhx.AV.Relay, listen_port: 5102)
+    ref = Process.monitor(pid)
+
+    # No stream yet -> the depayloader Tees don't exist. Attaching must be accepted
+    # (queued) and must NOT reference missing children / crash the shared relay.
+    reply =
+      Membrane.Pipeline.call(pid, {:add_browser, "b1", self(), Membrane.WebRTC.Signaling.new()})
+
+    assert reply == :ok
+    refute_receive {:DOWN, ^ref, :process, ^pid, _}, 800
+    Membrane.Pipeline.terminate(pid)
+  end
 end

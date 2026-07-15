@@ -7,15 +7,16 @@ defmodule BeamicomPhx.AV.Relay do
   LiveView pid and removes that browser's sink on `:DOWN` (reliable teardown that
   does not depend on LiveView `terminate/2`).
 
+  A browser can attach before the server's stream has arrived (the depayloader Tees
+  don't exist yet). Such attaches are QUEUED and drained once both streams are up,
+  so an early viewer can never reference missing children and crash the shared relay.
+
   ## Pad choice: `:push_output` on `Membrane.Tee`
 
-  `Membrane.Tee` has two output pad types:
-  - `:output` — pull/auto flow control; the slowest consumer dictates throughput.
-  - `:push_output` — push flow control; data is forwarded regardless of demand.
-
-  RTP over UDP is a push source (no back-pressure from the network). Using `:output`
-  would stall the tee if any browser's sink is slow. `:push_output` matches the live
-  streaming pattern: data arrives at the network rate and is forwarded to all sinks.
+  `Membrane.Tee` has `:output` (pull/auto — slowest consumer back-pressures everyone)
+  and `:push_output` (push — forwarded regardless of demand). RTP over UDP is a push
+  source with no back-pressure, so the fan-out uses `:push_output`; otherwise one slow
+  browser sink would stall the whole relay.
   Source: `deps/membrane_core/lib/membrane/tee.ex`.
   """
   use Membrane.Pipeline
@@ -45,49 +46,85 @@ defmodule BeamicomPhx.AV.Relay do
       |> get_child(:rtp)
     ]
 
-    {[spec: spec], %{tees: %{}, browsers: %{}}}
+    {[spec: spec], %{tees: MapSet.new(), browsers: %{}, pending: []}}
   end
 
-  # SessionBin re-notifies the {:new_rtp_stream, ssrc, pt, extensions} notification
-  # from its internal ssrc_router to the parent pipeline.
-  # Source: deps/membrane_rtp_plugin/lib/membrane/rtp/session_bin.ex handle_child_notification/4
+  # SessionBin re-notifies {:new_rtp_stream, ssrc, payload_type, extensions} from its
+  # internal ssrc_router. Video is PT 96, audio PT 111 (set by the server's SessionBin).
+  # Source: deps/membrane_rtp_plugin/lib/membrane/rtp/session_bin.ex
   @impl true
   def handle_child_notification({:new_rtp_stream, ssrc, 96, _ext}, :rtp, _ctx, state) do
-    spec =
+    tee_spec =
       get_child(:rtp)
       |> via_out(Pad.ref(:output, ssrc),
         options: [depayloader: Membrane.RTP.H264.Depayloader, encoding: :H264]
       )
       |> child(:video_tee, Membrane.Tee)
 
-    {[spec: spec], put_in(state, [:tees, :video], true)}
+    stream_ready(state, :video, tee_spec)
   end
 
   def handle_child_notification({:new_rtp_stream, ssrc, 111, _ext}, :rtp, _ctx, state) do
-    spec =
+    tee_spec =
       get_child(:rtp)
       |> via_out(Pad.ref(:output, ssrc),
         options: [depayloader: Membrane.RTP.Opus.Depayloader, encoding: :OPUS]
       )
       |> child(:audio_tee, Membrane.Tee)
 
-    {[spec: spec], put_in(state, [:tees, :audio], true)}
+    stream_ready(state, :audio, tee_spec)
   end
 
   def handle_child_notification(_msg, _child, _ctx, state), do: {[], state}
 
-  # handle_call must return {[reply: reply_val | other_actions], state}.
-  # The {:reply, value} action sends the reply to the blocked caller.
-  # Source: deps/membrane_core/lib/membrane/pipeline/action.ex type reply/0
-  # Source: deps/membrane_core/lib/membrane/pipeline.ex handle_call/3 callback spec
+  # handle_call must return {[reply: value | other_actions], state}; the reply action
+  # unblocks the caller. Source: deps/membrane_core/lib/membrane/pipeline/action.ex
   @impl true
   def handle_call({:add_browser, id, lv_pid, signaling}, _ctx, state) do
     Process.monitor(lv_pid)
+
+    if ready?(state) do
+      {[reply: :ok, spec: browser_spec(id, signaling)], put_in(state, [:browsers, lv_pid], id)}
+    else
+      # Stream not up yet — queue; attach when both Tees arrive (see stream_ready/3).
+      {[reply: :ok], %{state | pending: [{id, lv_pid, signaling} | state.pending]}}
+    end
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, lv_pid, _reason}, _ctx, state) do
+    state = %{state | pending: Enum.reject(state.pending, fn {_id, lv, _sig} -> lv == lv_pid end)}
+
+    case Map.pop(state.browsers, lv_pid) do
+      {nil, _} -> {[], state}
+      {id, browsers} -> {[remove_children: [{:sink, id}]], %{state | browsers: browsers}}
+    end
+  end
+
+  # Record the new Tee; once both video+audio are present, drain any queued browsers.
+  defp stream_ready(state, kind, tee_spec) do
+    state = %{state | tees: MapSet.put(state.tees, kind)}
+
+    if ready?(state) and state.pending != [] do
+      specs = Enum.flat_map(state.pending, fn {id, _lv, sig} -> browser_spec(id, sig) end)
+
+      browsers =
+        Enum.reduce(state.pending, state.browsers, fn {id, lv, _}, acc -> Map.put(acc, lv, id) end)
+
+      {[spec: [tee_spec | specs]], %{state | pending: [], browsers: browsers}}
+    else
+      {[spec: tee_spec], state}
+    end
+  end
+
+  defp ready?(state),
+    do: MapSet.member?(state.tees, :video) and MapSet.member?(state.tees, :audio)
+
+  # Children + links to attach one browser's WebRTC.Sink to both Tees.
+  defp browser_spec(id, signaling) do
     sink = {:sink, id}
 
-    # `:push_output` is used (not `:output`) because RTP/UDP is a push source.
-    # See moduledoc for rationale.
-    spec = [
+    [
       child(sink, %Membrane.WebRTC.Sink{
         signaling: signaling,
         tracks: [:audio, :video],
@@ -102,15 +139,5 @@ defmodule BeamicomPhx.AV.Relay do
       |> via_in(Pad.ref(:input, {id, :audio}), options: [kind: :audio])
       |> get_child(sink)
     ]
-
-    {[reply: :ok, spec: spec], put_in(state, [:browsers, lv_pid], id)}
-  end
-
-  @impl true
-  def handle_info({:DOWN, _ref, :process, lv_pid, _reason}, _ctx, state) do
-    case Map.pop(state.browsers, lv_pid) do
-      {nil, _} -> {[], state}
-      {id, browsers} -> {[remove_children: [{:sink, id}]], %{state | browsers: browsers}}
-    end
   end
 end
