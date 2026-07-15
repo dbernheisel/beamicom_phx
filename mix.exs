@@ -80,7 +80,8 @@ defmodule BeamicomPhx.MixProject do
       {:membrane_h26x_plugin, "~> 0.11"},
       # Raw A/V format structs referenced directly by our custom sources
       {:membrane_raw_video_format, "~> 0.4"},
-      {:membrane_raw_audio_format, "~> 0.12"}
+      {:membrane_raw_audio_format, "~> 0.12"},
+      {:membrane_udp_plugin, "~> 0.14.4"}
     ]
   end
 
