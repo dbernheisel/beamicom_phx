@@ -30,7 +30,6 @@ defmodule BeamicomPhx.AV.VideoSource do
       width: @width,
       height: @height,
       pixel_format: :RGB,
-      # NES runs ~60.0988 fps (no clean rational); PTS carries the true timing.
       framerate: nil,
       aligned: true
     }

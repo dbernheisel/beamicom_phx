@@ -20,22 +20,30 @@ if System.get_env("PHX_SERVER") do
   config :beamicom_phx, BeamicomPhxWeb.Endpoint, server: true
 end
 
-config :beamicom_phx, BeamicomPhxWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+mode =
+  case System.get_env("BEAMICOM_MODE", "server") do
+    "client" -> :client
+    _ -> :server
+  end
+
+port = case {System.get_env("PORT"), mode} do
+  {port, _} when not is_nil(port) -> String.to_integer(port)
+  {_, :server} -> 4044
+  {_, :client} -> 4045
+end
+
+config :beamicom_phx, BeamicomPhxWeb.Endpoint, http: [port: port]
 
 # Beamicom mode: "server" runs the emulator and streams it; "client" (Phase 2)
 # relays a remote server. Watch-only Phase 1 supports server mode only.
 # Explicit map (not String.to_atom) — never intern atoms from env/user input.
-config :beamicom_phx,
-       :mode,
-       (case System.get_env("BEAMICOM_MODE", "server") do
-          "client" -> :client
-          _ -> :server
-        end)
+config :beamicom_phx, :mode, mode
 
 # Absolute path to a .nes ROM the server should run. If unset in server mode,
 # the app still boots but the emulator does not start (log a warning).
-config :beamicom_phx, :rom, System.get_env("BEAMICOM_ROM")
+if mode == :server and config_env() != :test do
+  config :beamicom_phx, :rom, System.get_env("BEAMICOM_ROM") || raise "server mode requires BEAMICOM_ROM to be supplied"
+end
 
 if config_env() == :dev do
   # Reload browser tabs when matching files change.
