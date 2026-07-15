@@ -26,11 +26,24 @@ import {createPlayerHook} from "membrane_webrtc_plugin"
 import {hooks as colocatedHooks} from "phoenix-colocated/beamicom_phx"
 import topbar from "../vendor/topbar"
 
+// Stop arrow keys / space from scrolling the page while playing; the keydown
+// still reaches the server via phx-window-keydown.
+const gameKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "])
+const PreventGameKeyScroll = {
+  mounted() {
+    this.handler = e => { if (gameKeys.has(e.key)) e.preventDefault() }
+    window.addEventListener("keydown", this.handler)
+  },
+  destroyed() {
+    window.removeEventListener("keydown", this.handler)
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}])},
+  hooks: {...colocatedHooks, Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]), PreventGameKeyScroll},
 })
 
 // Show progress bar on live navigation and form submits

@@ -27,6 +27,38 @@ defmodule BeamicomPhx.InputTest do
     end
   end
 
+  describe "apply_key/3" do
+    test "keydown adds the button; returns the new held set and full button list" do
+      assert {held, buttons} = Input.apply_key(MapSet.new(), :down, "ArrowRight")
+      assert MapSet.equal?(held, MapSet.new([:right]))
+      assert buttons == [:right]
+    end
+
+    test "accumulates multiple held buttons" do
+      {held, _} = Input.apply_key(MapSet.new(), :down, "ArrowRight")
+      {held, buttons} = Input.apply_key(held, :down, "x")
+      assert MapSet.equal?(held, MapSet.new([:right, :a]))
+      assert Enum.sort(buttons) == [:a, :right]
+    end
+
+    test "keyup removes the button" do
+      held = MapSet.new([:right, :a])
+      {held, buttons} = Input.apply_key(held, :up, "ArrowRight")
+      assert MapSet.equal?(held, MapSet.new([:a]))
+      assert buttons == [:a]
+    end
+
+    test "keydown of an already-held button is idempotent (key auto-repeat)" do
+      held = MapSet.new([:a])
+      {new_held, _} = Input.apply_key(held, :down, "x")
+      assert MapSet.equal?(new_held, held)
+    end
+
+    test "ignores unmapped keys" do
+      assert Input.apply_key(MapSet.new([:a]), :down, "q") == :ignore
+    end
+  end
+
   describe "press/2" do
     test "is a no-op (returns :ok) when no local Runtime is running" do
       # In the test env the emulator Runtime is not started; press must not crash.

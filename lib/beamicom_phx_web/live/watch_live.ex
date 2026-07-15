@@ -9,6 +9,7 @@ defmodule BeamicomPhxWeb.WatchLive do
   """
   use BeamicomPhxWeb, :live_view
 
+  alias BeamicomPhx.Input
   alias Membrane.WebRTC.Live.Player
 
   @impl true
@@ -25,16 +26,52 @@ defmodule BeamicomPhxWeb.WatchLive do
         socket
       end
 
-    {:ok, socket}
+    # The set of controller buttons currently held down; the NES controller is
+    # stateful (each poll replaces the full set), so we track it and resend the
+    # whole list on every change.
+    {:ok, assign(socket, held: MapSet.new())}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="p-4">
+    <div
+      id="game"
+      phx-hook="PreventGameKeyScroll"
+      phx-window-keydown="keydown"
+      phx-window-keyup="keyup"
+      class="p-4"
+    >
       <h1 class="text-xl font-bold mb-4">Beamicom</h1>
       <Player.live_render socket={@socket} player_id="videoPlayer" />
+      <p class="mt-4 text-sm opacity-70">
+        Arrows = D-pad · X = A · Z = B · Enter = Start · Shift = Select
+      </p>
     </div>
     """
+  end
+
+  @impl true
+  def handle_event("keydown", %{"key" => key}, socket),
+    do: {:noreply, apply_key(socket, :down, key)}
+
+  def handle_event("keyup", %{"key" => key}, socket),
+    do: {:noreply, apply_key(socket, :up, key)}
+
+  # Update the held-button set and push the full list to the emulator, but only
+  # when the set actually changed (browsers fire keydown repeatedly while held).
+  defp apply_key(socket, dir, key) do
+    case Input.apply_key(socket.assigns.held, dir, key) do
+      :ignore ->
+        socket
+
+      {held, buttons} ->
+        if MapSet.equal?(held, socket.assigns.held) do
+          socket
+        else
+          Input.press(1, buttons)
+          assign(socket, held: held)
+        end
+    end
   end
 end

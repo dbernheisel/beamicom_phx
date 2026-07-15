@@ -27,6 +27,27 @@ defmodule BeamicomPhx.Input do
   def button_for(key) when is_binary(key), do: Map.get(@keymap, String.downcase(key))
 
   @doc """
+  Apply a key event to the currently-held button set. `dir` is `:down` or `:up`.
+  Returns `{new_held, buttons_list}` (the list to pass to `press/2`), or `:ignore`
+  for keys that aren't mapped to a button.
+  """
+  def apply_key(held, dir, key) when dir in [:down, :up] do
+    case button_for(key) do
+      nil ->
+        :ignore
+
+      button ->
+        new_held =
+          case dir do
+            :down -> MapSet.put(held, button)
+            :up -> MapSet.delete(held, button)
+          end
+
+        {new_held, MapSet.to_list(new_held)}
+    end
+  end
+
+  @doc """
   Set controller `port` to exactly the currently-held `buttons` (a list of button
   atoms). No-op when no local emulator Runtime is running.
   """
