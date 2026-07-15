@@ -27,11 +27,11 @@ defmodule BeamicomPhx.AV.VideoSourceTest do
       )
 
     assert_receive {Membrane.Testing.Pipeline, ^pipeline, :play}
-    # Wait for the VideoSource's handle_playing to complete so it has subscribed
-    # to Output before we publish.
     assert_receive {Membrane.Testing.Pipeline, ^pipeline, {:handle_child_playing, :src}}
 
-    # Source has subscribed to Output by now; publishing pushes it a frame.
+    # handle_child_playing can arrive before handle_playing's subscribe completes;
+    # wait for the subscription so publish doesn't race ahead of it.
+    assert BeamicomPhx.OutputSync.await_subscriber(:video) == :ok
     Beamicom.NES.Output.publish(blank_frame(1))
 
     assert_sink_stream_format(pipeline, :sink, %Membrane.RawVideo{

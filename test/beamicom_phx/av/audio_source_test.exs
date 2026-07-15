@@ -17,6 +17,9 @@ defmodule BeamicomPhx.AV.AudioSourceTest do
     assert_receive {Membrane.Testing.Pipeline, ^pipeline, :play}
     assert_receive {Membrane.Testing.Pipeline, ^pipeline, {:handle_child_playing, :src}}
 
+    # handle_child_playing can arrive before handle_playing's subscribe completes;
+    # wait for the subscription so publish doesn't race ahead of it.
+    assert BeamicomPhx.OutputSync.await_subscriber(:audio) == :ok
     Beamicom.NES.Output.publish_audio([0, 100, -100])
 
     assert_sink_stream_format(pipeline, :sink, %Membrane.RawAudio{
