@@ -54,11 +54,16 @@ defmodule BeamicomPhx.AV.Relay do
   # Source: deps/membrane_rtp_plugin/lib/membrane/rtp/session_bin.ex
   @impl true
   def handle_child_notification({:new_rtp_stream, ssrc, 96, _ext}, :rtp, _ctx, state) do
+    # The H264 depayloader emits NAL units carrying RTP metadata, but WebRTC.Sink's
+    # re-payloader needs the `:h264` NAL metadata that Membrane.H264.Parser attaches
+    # (its output is nalu_in_metadata?: true). Same parser the server runs after its
+    # encoder — without it the sink's payloader KeyErrors on `:h264` per buffer.
     tee_spec =
       get_child(:rtp)
       |> via_out(Pad.ref(:output, ssrc),
         options: [depayloader: Membrane.RTP.H264.Depayloader, encoding: :H264]
       )
+      |> child(:relay_h264_parser, %Membrane.H264.Parser{output_alignment: :nalu})
       |> child(:video_tee, Membrane.Tee)
 
     stream_ready(state, :video, tee_spec)
