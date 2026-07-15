@@ -12,15 +12,22 @@ defmodule BeamicomPhx.OutputSync do
   """
 
   def await_subscriber(kind) when kind in [:video, :audio] do
-    Enum.reduce_while(1..250, :timeout, fn _, _ ->
-      state = :sys.get_state(Beamicom.NES.Output)
+    result =
+      Enum.reduce_while(1..250, :timeout, fn _, _ ->
+        state = :sys.get_state(Beamicom.NES.Output)
 
-      if MapSet.size(Map.fetch!(state, kind)) > 0 do
-        {:halt, :ok}
-      else
-        Process.sleep(2)
-        {:cont, :timeout}
-      end
-    end)
+        if MapSet.size(Map.fetch!(state, kind)) > 0 do
+          {:halt, :ok}
+        else
+          Process.sleep(2)
+          {:cont, :timeout}
+        end
+      end)
+
+    if result == :timeout do
+      raise "await_subscriber(#{inspect(kind)}): no #{kind} subscriber registered within ~500ms"
+    end
+
+    :ok
   end
 end
