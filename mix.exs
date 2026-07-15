@@ -66,7 +66,19 @@ defmodule BeamicomPhx.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      # NES emulator core (auto-starts Beamicom.NES.Output; Runtime started on demand)
+      {:beamicom, path: "../beamicom"},
+      # Membrane A/V pipeline + WebRTC to the browser
+      {:membrane_core, "~> 1.3"},
+      {:membrane_webrtc_plugin, "~> 0.26"},
+      {:membrane_h264_ffmpeg_plugin, "~> 0.32"},
+      {:membrane_ffmpeg_swscale_plugin, "~> 0.16"},
+      {:membrane_opus_plugin, "~> 0.21"},
+      {:membrane_ffmpeg_swresample_plugin, "~> 0.20"},
+      # Raw A/V format structs referenced directly by our custom sources
+      {:membrane_raw_video_format, "~> 0.4"},
+      {:membrane_raw_audio_format, "~> 0.12"}
     ]
   end
 
