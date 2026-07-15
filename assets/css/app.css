@@ -103,3 +103,114 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* ── CRT watch page ─────────────────────────────────────────────────
+   A cream-plastic CRT set in a dark room lit by its own screen. The video
+   image is left untouched (no scanlines/curvature) — the "CRT" is the cabinet,
+   bezel and 4:3 screen it sits in. */
+.crt-room {
+  min-height: 100dvh;
+  display: grid;
+  grid-auto-rows: min-content;
+  place-content: center;
+  justify-items: center;
+  gap: clamp(1rem, 3vh, 2rem);
+  padding: clamp(1.5rem, 5vh, 4rem) 1rem;
+  background: radial-gradient(80% 60% at 50% 42%, #23201c 0%, #131211 45%, #0a0a0b 100%);
+}
+
+.crt {
+  position: relative;
+}
+
+/* soft light the screen throws into the room */
+.crt::before {
+  content: "";
+  position: absolute;
+  inset: -14% -10%;
+  z-index: -1;
+  background: radial-gradient(50% 45% at 50% 46%, rgba(150, 190, 255, 0.1), transparent 70%);
+  filter: blur(34px);
+  pointer-events: none;
+}
+
+.crt__cabinet {
+  padding: clamp(16px, 2.4vw, 34px);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #e7e1d2 0%, #d7d0be 6%, #c6bfab 60%, #b0a893 100%);
+  box-shadow:
+    inset 0 3px 2px rgba(255, 255, 255, 0.65),
+    inset 0 -6px 10px rgba(80, 68, 48, 0.45),
+    inset 0 0 0 1px rgba(120, 105, 78, 0.35),
+    0 30px 55px rgba(0, 0, 0, 0.6),
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+
+.crt__bezel {
+  padding: clamp(14px, 1.8vw, 26px);
+  border-radius: 22px;
+  background: linear-gradient(160deg, #2c2b29, #171615 60%, #0c0c0b);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.08),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.8);
+}
+
+.crt__screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px / 20px;
+  background: #000;
+  box-shadow:
+    inset 0 0 22px 6px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(0, 0, 0, 0.9);
+}
+
+.crt__screen video {
+  display: block;
+  width: min(78vw, 680px);
+  aspect-ratio: 4 / 3;
+  object-fit: fill;
+  background: #000;
+  border-radius: 14px / 18px;
+}
+
+/* keep the screen clean — hide the browser's video chrome */
+.crt__screen video::-webkit-media-controls,
+.crt__screen video::-webkit-media-controls-enclosure,
+.crt__screen video::-webkit-media-controls-panel {
+  display: none !important;
+}
+
+.crt__plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: clamp(10px, 1.4vw, 18px);
+}
+
+.crt__brand {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  color: #6f6650;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55), 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.crt__led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff9d8f, #e12915 55%, #7c1408);
+  box-shadow: 0 0 7px 1px rgba(225, 41, 21, 0.85), inset 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.crt__controls {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #7c7768;
+  text-align: center;
+}

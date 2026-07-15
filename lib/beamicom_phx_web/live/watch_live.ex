@@ -40,12 +40,23 @@ defmodule BeamicomPhxWeb.WatchLive do
       phx-hook="PreventGameKeyScroll"
       phx-window-keydown="keydown"
       phx-window-keyup="keyup"
-      class="p-4"
+      class="crt-room"
     >
-      <h1 class="text-xl font-bold mb-4">Beamicom</h1>
-      <Player.live_render socket={@socket} player_id="videoPlayer" />
-      <p class="mt-4 text-sm opacity-70">
-        Arrows = D-pad · X = A · Z = B · Enter = Start · Shift = Select
+      <div class="crt">
+        <div class="crt__cabinet">
+          <div class="crt__bezel">
+            <div class="crt__screen">
+              <Player.live_render socket={@socket} player_id="videoPlayer" />
+            </div>
+          </div>
+          <div class="crt__plate">
+            <span class="crt__brand">BEAMICOM</span>
+            <span class="crt__led" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <p class="crt__controls">
+        Arrows = D-pad &nbsp;·&nbsp; X = A &nbsp;·&nbsp; Z = B &nbsp;·&nbsp; Enter = Start &nbsp;·&nbsp; Shift = Select
       </p>
     </div>
     """

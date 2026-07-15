@@ -6,8 +6,8 @@ defmodule BeamicomPhxWeb.WatchLiveTest do
   # suite uncontaminated. The live_render wrapper for "videoPlayer" emits
   # id="videoPlayer-lv" in the dead render HTML, which is enough to confirm
   # the route exists and the player element is wired up.
-  test "GET /watch renders the player element", %{conn: conn} do
-    conn = get(conn, ~p"/watch")
+  test "GET / renders the player element", %{conn: conn} do
+    conn = get(conn, ~p"/")
     assert html_response(conn, 200) =~ "videoPlayer"
   end
 end

@@ -17,8 +17,7 @@ defmodule BeamicomPhxWeb.Router do
   scope "/", BeamicomPhxWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
-    live "/watch", WatchLive
+    live "/", WatchLive
   end
 
   # Other scopes may use custom stacks.
