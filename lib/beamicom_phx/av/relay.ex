@@ -65,11 +65,16 @@ defmodule BeamicomPhx.AV.Relay do
   end
 
   def handle_child_notification({:new_rtp_stream, ssrc, 111, _ext}, :rtp, _ctx, state) do
+    # The Opus depayloader emits %RemoteStream{content_format: Opus}, but WebRTC.Sink
+    # accepts raw `Membrane.Opus`. Membrane.Opus.Parser bridges the two (RemoteStream
+    # in -> %Opus{} out). (Video needs no parser: the H264 depayloader already emits
+    # %H264{alignment: :nalu}, which the sink accepts.)
     tee_spec =
       get_child(:rtp)
       |> via_out(Pad.ref(:output, ssrc),
         options: [depayloader: Membrane.RTP.Opus.Depayloader, encoding: :OPUS]
       )
+      |> child(:opus_parser, Membrane.Opus.Parser)
       |> child(:audio_tee, Membrane.Tee)
 
     stream_ready(state, :audio, tee_spec)
