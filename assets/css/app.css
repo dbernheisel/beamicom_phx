@@ -214,3 +214,34 @@
   color: #7c7768;
   text-align: center;
 }
+
+.crt__rom {
+  display: block;
+  max-width: 420px;
+  margin-inline: auto;
+  padding: 14px 18px;
+  border: 1px dashed #4a453b;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #8a8676;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.crt__rom:hover {
+  border-color: #6f6650;
+  color: #b8b1a0;
+}
+
+/* Native file input hidden — the whole label is the drop target / click zone. */
+.crt__rom-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
