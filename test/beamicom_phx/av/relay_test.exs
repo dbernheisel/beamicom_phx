@@ -12,12 +12,12 @@ defmodule BeamicomPhx.AV.RelayTest do
     Membrane.Pipeline.terminate(pid)
   end
 
-  test "attaching a browser before the stream arrives queues without crashing" do
+  test "attaching a browser before the stream arrives succeeds without crashing" do
     {:ok, _sup, pid} = Membrane.Pipeline.start_link(BeamicomPhx.AV.Relay, listen_port: 5102)
     ref = Process.monitor(pid)
 
-    # No stream yet -> the depayloader Tees don't exist. Attaching must be accepted
-    # (queued) and must NOT reference missing children / crash the shared relay.
+    # Tees exist from init (no SessionBin wait), so attach returns :ok immediately
+    # and must NOT crash the shared relay.
     reply =
       Membrane.Pipeline.call(pid, {:add_browser, "b1", self(), Membrane.WebRTC.Signaling.new()})
 

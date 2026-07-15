@@ -1,15 +1,26 @@
 defmodule BeamicomPhx.AV.Relay do
   @moduledoc """
-  Client-side relay: receive the server's RTP over UDP, depayload to encoded
-  H264/Opus (no re-encode), and fan out to one `Membrane.WebRTC.Sink` per browser.
+  Client-side relay: receive the server's AV1/Opus RTP over UDP, forward raw
+  `%Membrane.RTP{}` buffers to each browser's `Membrane.WebRTC.Sink` (with
+  `payload_rtp: false`), and fan out to one sink per browser.
 
   Browsers attach with `add_browser/3` from their LiveView; the Relay monitors the
   LiveView pid and removes that browser's sink on `:DOWN` (reliable teardown that
   does not depend on LiveView `terminate/2`).
 
-  A browser can attach before the server's stream has arrived (the depayloader Tees
-  don't exist yet). Such attaches are QUEUED and drained once both streams are up,
-  so an early viewer can never reference missing children and crash the shared relay.
+  ## Source-side pipeline
+
+  UDP.Source (video, port) → Membrane.RTP.Parser → Membrane.Tee (:video_tee)
+  UDP.Source (audio, port+2) → Membrane.RTP.Parser → Membrane.Tee (:audio_tee)
+
+  Both Tees are created at init, so browsers can attach immediately — no queuing
+  machinery is needed.
+
+  The server sends video on `listen_port` (PT 96, AV1) and audio on
+  `listen_port + 2` (PT 111, Opus). `Membrane.RTP.Parser` emits `%RTP{}` buffers
+  whose `metadata.rtp` carries the RTP header (timestamp, sequence_number, marker,
+  etc.). `Membrane.WebRTC.Sink` with `payload_rtp: false` accepts these directly and
+  re-packetizes per browser (reading `buffer.payload` + `metadata.rtp.marker`).
 
   ## Pad choice: `:push_output` on `Membrane.Tee`
 
@@ -37,52 +48,15 @@ defmodule BeamicomPhx.AV.Relay do
     port = Keyword.fetch!(opts, :listen_port)
 
     spec = [
-      child(:rtp, %RTP.SessionBin{fmt_mapping: %{96 => {:H264, 90_000}, 111 => {:OPUS, 48_000}}}),
       child(:udp_video, %UDP.Source{local_port_no: port})
-      |> via_in(Pad.ref(:rtp_input, :video))
-      |> get_child(:rtp),
+      |> child(:video_parser, RTP.Parser)
+      |> child(:video_tee, Membrane.Tee),
       child(:udp_audio, %UDP.Source{local_port_no: port + 2})
-      |> via_in(Pad.ref(:rtp_input, :audio))
-      |> get_child(:rtp)
+      |> child(:audio_parser, RTP.Parser)
+      |> child(:audio_tee, Membrane.Tee)
     ]
 
-    {[spec: spec], %{tees: MapSet.new(), browsers: %{}, pending: []}}
-  end
-
-  # SessionBin re-notifies {:new_rtp_stream, ssrc, payload_type, extensions} from its
-  # internal ssrc_router. Video is PT 96, audio PT 111 (set by the server's SessionBin).
-  # Source: deps/membrane_rtp_plugin/lib/membrane/rtp/session_bin.ex
-  @impl true
-  def handle_child_notification({:new_rtp_stream, ssrc, 96, _ext}, :rtp, _ctx, state) do
-    # The H264 depayloader emits NAL units carrying RTP metadata, but WebRTC.Sink's
-    # re-payloader needs the `:h264` NAL metadata that Membrane.H264.Parser attaches
-    # (its output is nalu_in_metadata?: true). Same parser the server runs after its
-    # encoder — without it the sink's payloader KeyErrors on `:h264` per buffer.
-    tee_spec =
-      get_child(:rtp)
-      |> via_out(Pad.ref(:output, ssrc),
-        options: [depayloader: Membrane.RTP.H264.Depayloader, encoding: :H264]
-      )
-      |> child(:relay_h264_parser, %Membrane.H264.Parser{output_alignment: :nalu})
-      |> child(:video_tee, Membrane.Tee)
-
-    stream_ready(state, :video, tee_spec)
-  end
-
-  def handle_child_notification({:new_rtp_stream, ssrc, 111, _ext}, :rtp, _ctx, state) do
-    # The Opus depayloader emits %RemoteStream{content_format: Opus}, but WebRTC.Sink
-    # accepts raw `Membrane.Opus`. Membrane.Opus.Parser bridges the two (RemoteStream
-    # in -> %Opus{} out). (Video needs no parser: the H264 depayloader already emits
-    # %H264{alignment: :nalu}, which the sink accepts.)
-    tee_spec =
-      get_child(:rtp)
-      |> via_out(Pad.ref(:output, ssrc),
-        options: [depayloader: Membrane.RTP.Opus.Depayloader, encoding: :OPUS]
-      )
-      |> child(:opus_parser, Membrane.Opus.Parser)
-      |> child(:audio_tee, Membrane.Tee)
-
-    stream_ready(state, :audio, tee_spec)
+    {[spec: spec], %{browsers: %{}}}
   end
 
   def handle_child_notification(_msg, _child, _ctx, state), do: {[], state}
@@ -93,44 +67,21 @@ defmodule BeamicomPhx.AV.Relay do
   def handle_call({:add_browser, id, lv_pid, signaling}, _ctx, state) do
     Process.monitor(lv_pid)
 
-    if ready?(state) do
-      {[reply: :ok, spec: browser_spec(id, signaling)], put_in(state, [:browsers, lv_pid], id)}
-    else
-      # Stream not up yet — queue; attach when both Tees arrive (see stream_ready/3).
-      {[reply: :ok], %{state | pending: [{id, lv_pid, signaling} | state.pending]}}
-    end
+    {[reply: :ok, spec: browser_spec(id, signaling)], put_in(state, [:browsers, lv_pid], id)}
   end
 
   @impl true
   def handle_info({:DOWN, _ref, :process, lv_pid, _reason}, _ctx, state) do
-    state = %{state | pending: Enum.reject(state.pending, fn {_id, lv, _sig} -> lv == lv_pid end)}
-
     case Map.pop(state.browsers, lv_pid) do
       {nil, _} -> {[], state}
       {id, browsers} -> {[remove_children: [{:sink, id}]], %{state | browsers: browsers}}
     end
   end
 
-  # Record the new Tee; once both video+audio are present, drain any queued browsers.
-  defp stream_ready(state, kind, tee_spec) do
-    state = %{state | tees: MapSet.put(state.tees, kind)}
-
-    if ready?(state) and state.pending != [] do
-      specs = Enum.flat_map(state.pending, fn {id, _lv, sig} -> browser_spec(id, sig) end)
-
-      browsers =
-        Enum.reduce(state.pending, state.browsers, fn {id, lv, _}, acc -> Map.put(acc, lv, id) end)
-
-      {[spec: [tee_spec | specs]], %{state | pending: [], browsers: browsers}}
-    else
-      {[spec: tee_spec], state}
-    end
-  end
-
-  defp ready?(state),
-    do: MapSet.member?(state.tees, :video) and MapSet.member?(state.tees, :audio)
-
   # Children + links to attach one browser's WebRTC.Sink to both Tees.
+  # The RTP.Parser already produced %RTP{} buffers, so no depayloader/parser sits
+  # between Tee and sink. `payload_rtp: false` tells the sink to forward the RTP
+  # payload and marker directly without re-payloading.
   defp browser_spec(id, signaling) do
     sink = {:sink, id}
 
@@ -138,7 +89,8 @@ defmodule BeamicomPhx.AV.Relay do
       child(sink, %Membrane.WebRTC.Sink{
         signaling: signaling,
         tracks: [:audio, :video],
-        video_codec: :h264
+        video_codec: :av1,
+        payload_rtp: false
       }),
       get_child(:video_tee)
       |> via_out(Pad.ref(:push_output, id))
