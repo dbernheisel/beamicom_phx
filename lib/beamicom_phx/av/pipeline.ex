@@ -27,10 +27,15 @@ defmodule BeamicomPhx.AV.Pipeline do
       # Video: RGB -> I420 -> AV1 (SVT, real-time) -> RTP payload -> sink
       child(:video_src, BeamicomPhx.AV.VideoSource)
       |> child(:scaler, %Membrane.FFmpeg.SWScale.Converter{format: :I420})
+      # Bandwidth is a non-issue at 256x240 over LAN, so favor quality: a low CRF
+      # (vs the plugin's default 35) and a slower preset (vs 10). NES pixel art also
+      # benefits from screen-content coding tools (scm), passed via config_parameters.
       |> child(:av1, %Membrane.AV1.Encoder{
         real_time_coding: true,
-        encoder_mode: 10,
-        approx_framerate: {60, 1}
+        encoder_mode: 8,
+        rate_control: {:crf, 20},
+        approx_framerate: {60, 1},
+        config_parameters: %{"scm" => "2"}
       })
       |> child(:av1_pay, BeamicomPhx.AV.Av1Payloader)
       |> via_in(:input, options: [kind: :video])
