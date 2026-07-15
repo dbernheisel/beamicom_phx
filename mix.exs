@@ -81,7 +81,8 @@ defmodule BeamicomPhx.MixProject do
       # Raw A/V format structs referenced directly by our custom sources
       {:membrane_raw_video_format, "~> 0.4"},
       {:membrane_raw_audio_format, "~> 0.12"},
-      {:membrane_udp_plugin, "~> 0.14.4"}
+      {:membrane_udp_plugin, "~> 0.14.4"},
+      {:membrane_av1_plugin, "~> 0.3.0"}
     ]
   end
 
