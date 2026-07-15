@@ -56,11 +56,31 @@ const PreventGameKeyScroll = {
   },
 }
 
+// On-screen NES controller: pointer down/up on a [data-btn] element presses/releases
+// the corresponding button on the server (same path as keyboard input). Pointer
+// events unify mouse + touch; capture guarantees the matching "up" so buttons can't
+// stick. preventDefault on down stops focus/scroll/selection.
+const Gamepad = {
+  mounted() {
+    this.el.querySelectorAll("[data-btn]").forEach(btn => {
+      const button = btn.dataset.btn
+      btn.addEventListener("pointerdown", e => {
+        e.preventDefault()
+        try { btn.setPointerCapture(e.pointerId) } catch (_) {}
+        this.pushEvent("button_down", {button})
+      })
+      const release = () => this.pushEvent("button_up", {button})
+      btn.addEventListener("pointerup", release)
+      btn.addEventListener("pointercancel", release)
+    })
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]), PreventGameKeyScroll},
+  hooks: {...colocatedHooks, Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]), PreventGameKeyScroll, Gamepad},
 })
 
 // Show progress bar on live navigation and form submits

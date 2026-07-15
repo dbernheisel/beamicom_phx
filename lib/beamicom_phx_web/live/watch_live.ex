@@ -86,6 +86,43 @@ defmodule BeamicomPhxWeb.WatchLive do
       <p class="crt__controls">
         Arrows = D-pad &nbsp;·&nbsp; X = A &nbsp;·&nbsp; Z = B &nbsp;·&nbsp; Enter = Start &nbsp;·&nbsp; Shift = Select
       </p>
+
+      <div id="gamepad" class="gamepad" phx-hook="Gamepad">
+        <div class="gamepad__dpad">
+          <button
+            type="button"
+            data-btn="up"
+            aria-label="Up"
+            class={["gamepad__d gamepad__d--up", pressed(@held, :up)]}
+          ></button>
+          <button
+            type="button"
+            data-btn="left"
+            aria-label="Left"
+            class={["gamepad__d gamepad__d--left", pressed(@held, :left)]}
+          ></button>
+          <button
+            type="button"
+            data-btn="right"
+            aria-label="Right"
+            class={["gamepad__d gamepad__d--right", pressed(@held, :right)]}
+          ></button>
+          <button
+            type="button"
+            data-btn="down"
+            aria-label="Down"
+            class={["gamepad__d gamepad__d--down", pressed(@held, :down)]}
+          ></button>
+        </div>
+        <div class="gamepad__mid">
+          <button type="button" data-btn="select" class={["gamepad__pill", pressed(@held, :select)]}>SELECT</button>
+          <button type="button" data-btn="start" class={["gamepad__pill", pressed(@held, :start)]}>START</button>
+        </div>
+        <div class="gamepad__ab">
+          <button type="button" data-btn="b" class={["gamepad__round", pressed(@held, :b)]}>B</button>
+          <button type="button" data-btn="a" class={["gamepad__round", pressed(@held, :a)]}>A</button>
+        </div>
+      </div>
       <label :if={@mode == :server} class="crt__rom" phx-drop-target={@uploads.rom.ref}>
         <.live_file_input upload={@uploads.rom} class="crt__rom-input" />
         {if @rom_name,
@@ -133,25 +170,38 @@ defmodule BeamicomPhxWeb.WatchLive do
 
   @impl true
   def handle_event("keydown", %{"key" => key}, socket),
-    do: {:noreply, apply_key(socket, :down, key)}
+    do: {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :down, key))}
 
   def handle_event("keyup", %{"key" => key}, socket),
-    do: {:noreply, apply_key(socket, :up, key)}
+    do: {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :up, key))}
 
-  # Update the held-button set and push the full list to the emulator, but only
-  # when the set actually changed (browsers fire keydown repeatedly while held).
-  defp apply_key(socket, dir, key) do
-    case Input.apply_key(socket.assigns.held, dir, key) do
-      :ignore ->
-        socket
+  # On-screen controller (pointer down/up via the Gamepad JS hook) — same path as keys.
+  def handle_event("button_down", %{"button" => name}, socket),
+    do: {:noreply, commit(socket, button_event(socket, :down, name))}
 
-      {held, buttons} ->
-        if MapSet.equal?(held, socket.assigns.held) do
-          socket
-        else
-          Input.press(1, buttons)
-          assign(socket, held: held)
-        end
+  def handle_event("button_up", %{"button" => name}, socket),
+    do: {:noreply, commit(socket, button_event(socket, :up, name))}
+
+  defp button_event(socket, dir, name) do
+    case Input.button_from_name(name) do
+      nil -> :ignore
+      button -> Input.apply_button(socket.assigns.held, dir, button)
     end
   end
+
+  # Push the held set to the emulator and re-render the controller, but only when
+  # the set actually changed (browsers fire keydown repeatedly while a key is held).
+  defp commit(socket, :ignore), do: socket
+
+  defp commit(socket, {held, buttons}) do
+    if MapSet.equal?(held, socket.assigns.held) do
+      socket
+    else
+      Input.press(1, buttons)
+      assign(socket, held: held)
+    end
+  end
+
+  # "is-pressed" for a button currently held (drives the on-screen highlight).
+  defp pressed(held, button), do: if(MapSet.member?(held, button), do: "is-pressed")
 end

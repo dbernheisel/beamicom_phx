@@ -23,8 +23,15 @@ defmodule BeamicomPhx.Input do
     "shift" => :select
   }
 
+  # The NES buttons, used to validate on-screen control names from the client.
+  @buttons ~w(up down left right a b start select)a
+  @button_names Map.new(@buttons, fn button -> {Atom.to_string(button), button} end)
+
   @doc "The NES button for a browser key name, or nil if unmapped."
   def button_for(key) when is_binary(key), do: Map.get(@keymap, String.downcase(key))
+
+  @doc "The NES button for an on-screen control name (e.g. \"a\", \"up\"), or nil if unknown."
+  def button_from_name(name) when is_binary(name), do: Map.get(@button_names, name)
 
   @doc """
   Apply a key event to the currently-held button set. `dir` is `:down` or `:up`.
@@ -33,19 +40,27 @@ defmodule BeamicomPhx.Input do
   """
   def apply_key(held, dir, key) when dir in [:down, :up] do
     case button_for(key) do
-      nil ->
-        :ignore
-
-      button ->
-        new_held =
-          case dir do
-            :down -> MapSet.put(held, button)
-            :up -> MapSet.delete(held, button)
-          end
-
-        {new_held, MapSet.to_list(new_held)}
+      nil -> :ignore
+      button -> apply_button(held, dir, button)
     end
   end
+
+  @doc """
+  Apply a button press/release directly (from an on-screen control). `dir` is
+  `:down`/`:up`. Returns `{new_held, buttons_list}`, or `:ignore` for an unknown
+  button. Shares the held-set semantics with `apply_key/3`.
+  """
+  def apply_button(held, dir, button) when dir in [:down, :up] and button in @buttons do
+    new_held =
+      case dir do
+        :down -> MapSet.put(held, button)
+        :up -> MapSet.delete(held, button)
+      end
+
+    {new_held, MapSet.to_list(new_held)}
+  end
+
+  def apply_button(_held, _dir, _button), do: :ignore
 
   @doc """
   Set controller `port` to exactly the currently-held `buttons` (a list of button

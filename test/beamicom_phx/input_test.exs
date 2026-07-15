@@ -59,6 +59,26 @@ defmodule BeamicomPhx.InputTest do
     end
   end
 
+  describe "button_from_name/1 and apply_button/3" do
+    test "button_from_name maps known control names, nil otherwise" do
+      assert Input.button_from_name("a") == :a
+      assert Input.button_from_name("up") == :up
+      assert Input.button_from_name("start") == :start
+      assert Input.button_from_name("bogus") == nil
+    end
+
+    test "apply_button presses/releases like apply_key" do
+      assert {held, [:a]} = Input.apply_button(MapSet.new(), :down, :a)
+      assert MapSet.equal?(held, MapSet.new([:a]))
+      assert {released, []} = Input.apply_button(held, :up, :a)
+      assert MapSet.equal?(released, MapSet.new())
+    end
+
+    test "apply_button ignores unknown buttons" do
+      assert Input.apply_button(MapSet.new(), :down, :turbo) == :ignore
+    end
+  end
+
   describe "press/2" do
     test "is a no-op (returns :ok) when no local Runtime is running" do
       # In the test env the emulator Runtime is not started; press must not crash.
