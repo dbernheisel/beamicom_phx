@@ -7,7 +7,7 @@ defmodule BeamicomPhx.AV.VideoSource do
   """
   use Membrane.Source
 
-  alias Beamicom.NES.{Output, Palette}
+  alias Beamicom.NES.{Framebuffer, Output, Palette}
 
   @width 256
   @height 240
@@ -30,7 +30,8 @@ defmodule BeamicomPhx.AV.VideoSource do
       width: @width,
       height: @height,
       pixel_format: :RGB,
-      framerate: {60, 1},
+      # NES runs ~60.0988 fps (no clean rational); PTS carries the true timing.
+      framerate: nil,
       aligned: true
     }
 
@@ -40,7 +41,7 @@ defmodule BeamicomPhx.AV.VideoSource do
   @impl true
   def handle_info({:frame, number}, _ctx, state) do
     case Output.latest() do
-      %Beamicom.NES.Framebuffer{} = frame ->
+      %Framebuffer{} = frame ->
         buffer = %Membrane.Buffer{
           payload: Palette.to_rgb(frame),
           pts: number * @period_ns
