@@ -38,6 +38,9 @@ defmodule BeamicomPhx.Application do
         Logger.warning("BEAMICOM_MODE=server but BEAMICOM_ROM is unset; emulator not started")
         []
 
+      mode == :client ->
+        [{BeamicomPhx.AV.Relay, listen_port: BeamicomPhx.RtpConfig.listen_port()}]
+
       true ->
         []
     end
