@@ -23,13 +23,15 @@ defmodule BeamicomPhx.Application do
 
   # server mode + a ROM path => run the emulator. Beamicom.NES.Output is already
   # started by the :beamicom application. Runtime produces frames/audio into it.
+  # When a relay target is also configured, the RtpBroadcast pipeline encodes once
+  # and streams RTP/UDP to the client node.
   defp emulator_children do
     mode = Application.get_env(:beamicom_phx, :mode, :server)
     rom = Application.get_env(:beamicom_phx, :rom)
 
     cond do
       mode == :server and is_binary(rom) ->
-        [{Beamicom.NES.Runtime, rom: rom}]
+        [{Beamicom.NES.Runtime, rom: rom}] ++ rtp_broadcast_children()
 
       mode == :server ->
         require Logger
@@ -38,6 +40,22 @@ defmodule BeamicomPhx.Application do
 
       true ->
         []
+    end
+  end
+
+  defp rtp_broadcast_children do
+    case BeamicomPhx.RtpConfig.target() do
+      nil ->
+        []
+
+      target ->
+        [
+          %{
+            id: BeamicomPhx.AV.RtpBroadcast,
+            start:
+              {Membrane.Pipeline, :start_link, [BeamicomPhx.AV.RtpBroadcast, [target: target]]}
+          }
+        ]
     end
   end
 
