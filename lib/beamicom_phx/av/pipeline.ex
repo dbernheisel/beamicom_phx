@@ -22,10 +22,16 @@ defmodule BeamicomPhx.AV.Pipeline do
       # Video: RGB frames -> I420 -> H264 (:au) -> parser (:nalu) -> WebRTC.
       # The FFmpeg encoder emits alignment: :au; the WebRTC.Sink requires alignment: :nalu,
       # so Membrane.H264.Parser (from membrane_h26x_plugin) re-aligns between them.
-      # ponytail: encoder defaults (no zerolatency tuning) until latency is measured.
+      # Low-latency real-time tuning: :zerolatency disables x264's rc-lookahead and
+      # frame reordering; :baseline forbids B-frames; :ultrafast minimizes encode time.
+      # Defaults would buffer many frames for compression — hundreds of ms of lag.
       child(:video_src, BeamicomPhx.AV.VideoSource)
       |> child(:scaler, %Membrane.FFmpeg.SWScale.Converter{format: :I420})
-      |> child(:h264, Membrane.H264.FFmpeg.Encoder)
+      |> child(:h264, %Membrane.H264.FFmpeg.Encoder{
+        tune: :zerolatency,
+        preset: :ultrafast,
+        profile: :baseline
+      })
       |> child(:h264_parser, %Membrane.H264.Parser{output_alignment: :nalu})
       |> via_in(:input, options: [kind: :video])
       |> get_child(:sink),
