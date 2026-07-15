@@ -33,9 +33,26 @@ const PreventGameKeyScroll = {
   mounted() {
     this.handler = e => { if (gameKeys.has(e.key)) e.preventDefault() }
     window.addEventListener("keydown", this.handler)
+
+    // Browsers block audible autoplay, so the stream starts muted. Unmute on the
+    // first user gesture (a keypress to play counts). Retries until the video
+    // exists so an early press before the stream connects isn't wasted.
+    this.unmute = () => {
+      const v = document.getElementById("videoPlayer")
+      if (v) {
+        v.muted = false
+        v.volume = 1
+        window.removeEventListener("keydown", this.unmute)
+        window.removeEventListener("pointerdown", this.unmute)
+      }
+    }
+    window.addEventListener("keydown", this.unmute)
+    window.addEventListener("pointerdown", this.unmute)
   },
   destroyed() {
     window.removeEventListener("keydown", this.handler)
+    window.removeEventListener("keydown", this.unmute)
+    window.removeEventListener("pointerdown", this.unmute)
   },
 }
 
