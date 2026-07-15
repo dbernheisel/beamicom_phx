@@ -5,6 +5,10 @@ defmodule BeamicomPhx.AV.Pipeline do
   ponytail: one pipeline per browser connection (started by WatchLive). Fine for
   watch-only Phase 1. Upgrade path when multi-viewer/RTP (Phase 2) lands: a single
   shared encoder fanned out with `Membrane.Tee` to per-peer Sinks + the RTP output.
+
+  Video is encoded with SVT-AV1 and pre-payloaded into RTP by `BeamicomPhx.AV.Av1Payloader`
+  before reaching the sink (`payload_rtp: false` mode). Audio is pre-payloaded with
+  `Membrane.RTP.Opus.Payloader` for the same reason — `payload_rtp` is a sink-wide flag.
   """
   use Membrane.Pipeline
 
@@ -13,31 +17,26 @@ defmodule BeamicomPhx.AV.Pipeline do
     sink = %Membrane.WebRTC.Sink{
       signaling: Keyword.fetch!(opts, :egress_signaling),
       tracks: [:audio, :video],
-      video_codec: :h264
+      video_codec: :av1,
+      payload_rtp: false
     }
 
     spec = [
       child(:sink, sink),
 
-      # Video: RGB frames -> I420 -> H264 (:au) -> parser (:nalu) -> WebRTC.
-      # The FFmpeg encoder emits alignment: :au; the WebRTC.Sink requires alignment: :nalu,
-      # so Membrane.H264.Parser (from membrane_h26x_plugin) re-aligns between them.
-      # Low-latency real-time tuning: :zerolatency disables x264's rc-lookahead and
-      # frame reordering; :baseline forbids B-frames; :ultrafast minimizes encode time.
-      # Defaults would buffer many frames for compression — hundreds of ms of lag.
+      # Video: RGB -> I420 -> AV1 (SVT, real-time) -> RTP payload -> sink
       child(:video_src, BeamicomPhx.AV.VideoSource)
       |> child(:scaler, %Membrane.FFmpeg.SWScale.Converter{format: :I420})
-      |> child(:h264, %Membrane.H264.FFmpeg.Encoder{
-        tune: :zerolatency,
-        preset: :ultrafast,
-        profile: :baseline
+      |> child(:av1, %Membrane.AV1.Encoder{
+        real_time_coding: true,
+        encoder_mode: 10,
+        approx_framerate: {60, 1}
       })
-      |> child(:h264_parser, %Membrane.H264.Parser{output_alignment: :nalu})
+      |> child(:av1_pay, BeamicomPhx.AV.Av1Payloader)
       |> via_in(:input, options: [kind: :video])
       |> get_child(:sink),
 
-      # Audio: 44100 s16le mono -> 48000 s16le mono (Opus requires 48k) -> Opus -> WebRTC.
-      # SWResample auto-detects input format from upstream RawAudio; only output_stream_format needed.
+      # Audio: 44.1k s16le -> 48k -> Opus -> RTP payload -> sink
       child(:audio_src, BeamicomPhx.AV.AudioSource)
       |> child(:resampler, %Membrane.FFmpeg.SWResample.Converter{
         output_stream_format: %Membrane.RawAudio{
@@ -47,6 +46,7 @@ defmodule BeamicomPhx.AV.Pipeline do
         }
       })
       |> child(:opus, Membrane.Opus.Encoder)
+      |> child(:opus_pay, Membrane.RTP.Opus.Payloader)
       |> via_in(:input, options: [kind: :audio])
       |> get_child(:sink)
     ]
