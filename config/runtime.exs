@@ -29,7 +29,7 @@ mode =
 port = case {System.get_env("PORT"), mode} do
   {port, _} when not is_nil(port) -> String.to_integer(port)
   {_, :server} -> 4044
-  {_, :client} -> 4045
+  {_, :client} -> 4046
 end
 
 config :beamicom_phx, BeamicomPhxWeb.Endpoint, http: [port: port]
