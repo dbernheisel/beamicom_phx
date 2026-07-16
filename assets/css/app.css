@@ -232,7 +232,8 @@
   transition: border-color 0.15s, color 0.15s;
 }
 
-.crt__rom:hover {
+.crt__rom:hover,
+.crt__rom.phx-drop-target-active {
   border-color: #6f6650;
   color: #b8b1a0;
 }

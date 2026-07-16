@@ -88,19 +88,27 @@ defmodule BeamicomPhxWeb.WatchLive do
           </div>
         </div>
       </div>
-      <p class="crt__controls">
+      <p :if={@mode == :server} class="crt__controls">
         Arrows = D-pad &nbsp;·&nbsp; X = A &nbsp;·&nbsp; Z = B &nbsp;·&nbsp; Enter = Start &nbsp;·&nbsp; Shift = Select
       </p>
 
-      <div id="gamepad" class="gamepad" phx-hook="Gamepad" data-held={held_names(@held)}>
+      <div
+        :if={@mode == :server}
+        id="gamepad"
+        class="gamepad"
+        phx-hook="Gamepad"
+        data-held={held_names(@held)}
+      >
         {raw(controller_svg())}
       </div>
-      <label :if={@mode == :server} class="crt__rom" phx-drop-target={@uploads.rom.ref}>
-        <.live_file_input upload={@uploads.rom} class="crt__rom-input" />
-        {if @rom_name,
-          do: "▸ #{@rom_name} — drop a .nes to change",
-          else: "Drop a .nes ROM here to load"}
-      </label>
+      <form :if={@mode == :server} phx-change="validate">
+        <label class="crt__rom" phx-drop-target={@uploads.rom.ref}>
+          <.live_file_input upload={@uploads.rom} class="crt__rom-input" />
+          {if @rom_name,
+            do: "▸ #{@rom_name} — drop a .nes to change",
+            else: "Drop a .nes ROM here to load"}
+        </label>
+      </form>
     </div>
     """
   end
@@ -139,6 +147,9 @@ defmodule BeamicomPhxWeb.WatchLive do
         {:noreply, socket}
     end
   end
+
+  @impl true
+  def handle_event("validate", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("keydown", %{"key" => key}, socket),
