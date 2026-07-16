@@ -47,12 +47,16 @@ defmodule BeamicomPhx.AV.Relay do
   def handle_init(_ctx, opts) do
     port = Keyword.fetch!(opts, :listen_port)
 
+    # RtpPts restores buffer PTS from the parsed RTP timestamp — RTP.Parser leaves it
+    # nil, and the payload_rtp:false WebRTC.Sink crashes without one.
     spec = [
       child(:udp_video, %UDP.Source{local_port_no: port})
       |> child(:video_parser, RTP.Parser)
+      |> child(:video_pts, %BeamicomPhx.AV.RtpPts{clock_rate: 90_000})
       |> child(:video_tee, Membrane.Tee),
       child(:udp_audio, %UDP.Source{local_port_no: port + 2})
       |> child(:audio_parser, RTP.Parser)
+      |> child(:audio_pts, %BeamicomPhx.AV.RtpPts{clock_rate: 48_000})
       |> child(:audio_tee, Membrane.Tee)
     ]
 
