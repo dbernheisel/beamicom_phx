@@ -40,6 +40,17 @@ config :beamicom_phx, BeamicomPhxWeb.Endpoint, http: [port: port]
 # Explicit map (not String.to_atom) — never intern atoms from env/user input.
 config :beamicom_phx, :mode, mode
 
+# Where save-state PNGs are stored and read at runtime. Defaults to the XDG data
+# directory ($XDG_DATA_HOME/beamicom/saves, falling back to ~/.local/share).
+config :beamicom_phx,
+       :saves_dir,
+       System.get_env("BEAMICOM_SAVES_DIR") ||
+         Path.join([
+           System.get_env("XDG_DATA_HOME") || Path.join(System.user_home!(), ".local/share"),
+           "beamicom",
+           "saves"
+         ])
+
 # Absolute path to a .nes ROM the server should run. If unset in server mode,
 # the app still boots but the emulator does not start (log a warning).
 if mode == :server and config_env() != :test do

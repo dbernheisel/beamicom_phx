@@ -1,7 +1,8 @@
 defmodule BeamicomPhx.Saves do
   @moduledoc """
-  On-disk gallery of save-state share PNGs, served straight from
-  `priv/static/saves` (whitelisted in `BeamicomPhxWeb.static_paths/0`).
+  On-disk gallery of save-state share PNGs. The directory is configured at
+  runtime (`:beamicom_phx, :saves_dir`, default `$XDG_DATA_HOME/beamicom/saves`)
+  and files are served by `BeamicomPhxWeb.SaveController` at `/saves/<file>`.
 
   Saves are global, matching the single shared emulator: capturing broadcasts on
   the `"saves"` PubSub topic so every connected `WatchLive` refreshes its grid.
@@ -11,8 +12,8 @@ defmodule BeamicomPhx.Saves do
 
   @topic "saves"
 
-  @doc "Directory holding the save PNGs (served at /saves/<file>)."
-  def dir, do: Path.join(:code.priv_dir(:beamicom_phx), "static/saves")
+  @doc "Directory holding the save PNGs (configured at runtime; served at /saves/<file>)."
+  def dir, do: Application.fetch_env!(:beamicom_phx, :saves_dir)
 
   @doc "Subscribe the caller to gallery-change notifications."
   def subscribe, do: Phoenix.PubSub.subscribe(BeamicomPhx.PubSub, @topic)
