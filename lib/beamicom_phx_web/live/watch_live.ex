@@ -32,10 +32,11 @@ defmodule BeamicomPhxWeb.WatchLive do
           _server ->
             {:ok, _supervisor, _pipeline} =
               Membrane.Pipeline.start_link(BeamicomPhx.AV.Pipeline, egress_signaling: signaling)
-
-            Saves.subscribe()
         end
 
+        # Both modes watch the gallery (read-only for clients); saving/loading is
+        # gated to server mode in the render and the event handlers.
+        Saves.subscribe()
         Player.attach(socket, id: "videoPlayer", signaling: signaling)
       else
         socket
@@ -49,7 +50,7 @@ defmodule BeamicomPhxWeb.WatchLive do
         held: MapSet.new(),
         mode: mode,
         rom_name: nil,
-        saves: if(mode == :server, do: Saves.list(), else: [])
+        saves: Saves.list()
       )
 
     socket =
@@ -116,14 +117,14 @@ defmodule BeamicomPhxWeb.WatchLive do
         Save state
       </button>
 
-      <div :if={@mode == :server and @saves != []} class="save-gallery">
+      <div :if={@saves != []} class="save-gallery">
         <button
           :for={url <- @saves}
           type="button"
-          class="save-thumb"
-          phx-click="load_save"
+          class={["save-thumb", @mode != :server && "save-thumb--readonly"]}
+          phx-click={@mode == :server && "load_save"}
           phx-value-url={url}
-          title="Load this save"
+          title={if @mode == :server, do: "Load this save", else: "Saves (view only)"}
         >
           <img src={url} alt="save state" />
         </button>
@@ -159,21 +160,26 @@ defmodule BeamicomPhxWeb.WatchLive do
   @impl true
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
-  # Capture the live emulator to a new save PNG. The PubSub broadcast refreshes
-  # this and every other viewer's gallery via handle_info(:saves_changed, …).
-  def handle_event("save_state", _params, socket) do
+  # Saving and loading are server-only writes; the guards make clients read-only
+  # even if they forge the event. Capturing broadcasts, so every viewer's gallery
+  # refreshes via handle_info(:saves_changed, …).
+  def handle_event("save_state", _params, %{assigns: %{mode: :server}} = socket) do
     case Saves.capture() do
       {:ok, _url} -> {:noreply, socket}
       {:error, _reason} -> {:noreply, put_flash(socket, :error, "Nothing to save yet")}
     end
   end
 
-  # Load a clicked save into the shared emulator (all viewers follow).
-  def handle_event("load_save", %{"url" => url}, socket) do
+  def handle_event("load_save", %{"url" => url}, %{assigns: %{mode: :server}} = socket) do
     case Saves.load(url) do
       :ok -> {:noreply, socket}
       _ -> {:noreply, put_flash(socket, :error, "Couldn't load that save")}
     end
+  end
+
+  # Client mode is read-only: ignore any save/load attempt.
+  def handle_event(event, _params, socket) when event in ~w(save_state load_save) do
+    {:noreply, socket}
   end
 
   @impl true

@@ -308,6 +308,15 @@
   border-color: #a89a72;
 }
 
+/* Clients view saves read-only: no pointer affordance, no hover cue. */
+.save-thumb--readonly {
+  cursor: default;
+}
+
+.save-thumb--readonly:hover {
+  border-color: #4a453b;
+}
+
 .save-thumb img {
   display: block;
   width: 100%;
