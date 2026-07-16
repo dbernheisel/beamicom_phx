@@ -26,11 +26,12 @@ mode =
     _ -> :server
   end
 
-port = case {System.get_env("PORT"), mode} do
-  {port, _} when not is_nil(port) -> String.to_integer(port)
-  {_, :server} -> 4044
-  {_, :client} -> 4046
-end
+port =
+  case {System.get_env("PORT"), mode} do
+    {port, _} when not is_nil(port) -> String.to_integer(port)
+    {_, :server} -> 4044
+    {_, :client} -> 4046
+  end
 
 config :beamicom_phx, BeamicomPhxWeb.Endpoint, http: [port: port]
 
@@ -42,7 +43,38 @@ config :beamicom_phx, :mode, mode
 # Absolute path to a .nes ROM the server should run. If unset in server mode,
 # the app still boots but the emulator does not start (log a warning).
 if mode == :server and config_env() != :test do
-  config :beamicom_phx, :rom, System.get_env("BEAMICOM_ROM") || raise "server mode requires BEAMICOM_ROM to be supplied"
+  config :beamicom_phx,
+         :rom,
+         System.get_env("BEAMICOM_ROM") ||
+           raise("server mode requires BEAMICOM_ROM to be supplied")
+
+  parse_target =
+    fn
+      nil ->
+        nil
+
+      "" ->
+        nil
+
+      target when is_binary(target) ->
+        with [host, port] <- String.split(target, ":"),
+             {:ok, ip} <- :inet.parse_address(String.to_charlist(host)),
+             {port, ""} <- Integer.parse(port) do
+          {ip, port}
+        else
+          _ ->
+            raise ArgumentError,
+                  "invalid BEAMICOM_RTP_TARGET #{inspect(target)}, expected host:port"
+        end
+    end
+
+  config :beamicom_phx, :rtp_target, parse_target.(System.get_env("BEAMICOM_RTP_TARGET"))
+end
+
+if mode == :client and config_env() != :test do
+  config :beamicom_phx,
+         :rtp_listen,
+         String.to_integer(System.get_env("BEAMICOM_RTP_LISTEN", "5000"))
 end
 
 if config_env() == :dev do

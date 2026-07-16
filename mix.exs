@@ -67,7 +67,6 @@ defmodule BeamicomPhx.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      # NES emulator core (auto-starts Beamicom.NES.Output; Runtime started on demand)
       {:beamicom, path: "../beamicom"},
       # Membrane A/V pipeline + WebRTC to the browser
       {:membrane_core, "~> 1.3"},
@@ -76,8 +75,6 @@ defmodule BeamicomPhx.MixProject do
       {:membrane_ffmpeg_swscale_plugin, "~> 0.16"},
       {:membrane_opus_plugin, "~> 0.21"},
       {:membrane_ffmpeg_swresample_plugin, "~> 0.20"},
-      # H264 parser: converts :au alignment (ffmpeg encoder output) to :nalu (WebRTC sink input)
-      {:membrane_h26x_plugin, "~> 0.11"},
       # Raw A/V format structs referenced directly by our custom sources
       {:membrane_raw_video_format, "~> 0.4"},
       {:membrane_raw_audio_format, "~> 0.12"},

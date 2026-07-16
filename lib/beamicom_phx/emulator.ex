@@ -24,7 +24,7 @@ defmodule BeamicomPhx.Emulator do
 
   @doc "Stop any running Runtime and start a new one for `rom_path`."
   def load(rom_path) when is_binary(rom_path) do
-    _ = stop()
+    stop()
 
     case DynamicSupervisor.start_child(@sup, {Beamicom.NES.Runtime, rom: rom_path}) do
       {:ok, _pid} -> :ok
@@ -35,11 +35,11 @@ defmodule BeamicomPhx.Emulator do
   @doc "Stop the running Runtime, if any."
   def stop do
     case Process.whereis(Beamicom.NES.Runtime) do
-      nil -> :ok
-      pid -> DynamicSupervisor.terminate_child(@sup, pid)
+      pid when is_pid(pid) -> DynamicSupervisor.terminate_child(@sup, pid)
+      _ -> :ok
     end
   end
 
   @doc "Whether a Runtime is currently loaded."
-  def loaded?, do: is_pid(Process.whereis(Beamicom.NES.Runtime))
+  def loaded?, do: Beamicom.NES.Runtime |> Process.whereis() |> is_pid()
 end

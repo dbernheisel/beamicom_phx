@@ -81,7 +81,6 @@ defmodule BeamicomPhx.InputTest do
 
   describe "press/2" do
     test "is a no-op (returns :ok) when no local Runtime is running" do
-      # In the test env the emulator Runtime is not started; press must not crash.
       refute Process.whereis(Beamicom.NES.Runtime)
       assert Input.press(1, [:a, :start]) == :ok
     end

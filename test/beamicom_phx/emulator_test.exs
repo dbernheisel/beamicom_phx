@@ -4,7 +4,7 @@ defmodule BeamicomPhx.EmulatorTest do
   # it's excluded from the default suite to avoid contaminating the source tests.
   @moduletag :integration
 
-  @rom "/Users/dbern/beamicom/roms/sprite_hit_tests_2005.10.05/01.basics.nes"
+  @rom "test/support/fixtures/01.basics.nes"
 
   setup do
     on_exit(&BeamicomPhx.Emulator.stop/0)

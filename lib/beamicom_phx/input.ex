@@ -67,10 +67,6 @@ defmodule BeamicomPhx.Input do
   atoms). No-op when no local emulator Runtime is running.
   """
   def press(port, buttons) when is_integer(port) and is_list(buttons) do
-    if Process.whereis(Beamicom.NES.Runtime) do
-      Beamicom.NES.Runtime.set_buttons(port, buttons)
-    end
-
-    :ok
+    Beamicom.NES.Runtime.set_buttons(port, buttons)
   end
 end

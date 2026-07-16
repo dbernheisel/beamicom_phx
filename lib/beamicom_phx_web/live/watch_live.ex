@@ -26,13 +26,9 @@ defmodule BeamicomPhxWeb.WatchLive do
         signaling = Membrane.WebRTC.Signaling.new()
 
         case mode do
-          # Client node: attach to the shared Relay, which links a WebRTC.Sink for
-          # this browser and monitors us — it tears the sink down when we disconnect.
           :client ->
             BeamicomPhx.AV.Relay.add_browser(socket.id, self(), signaling)
 
-          # Server node: start this browser's own encode pipeline, linked to this
-          # LiveView so it dies with the socket.
           _server ->
             {:ok, _supervisor, _pipeline} =
               Membrane.Pipeline.start_link(BeamicomPhx.AV.Pipeline, egress_signaling: signaling)
@@ -50,10 +46,8 @@ defmodule BeamicomPhxWeb.WatchLive do
 
     socket =
       if mode == :server do
-        # accept: :any because ".nes" isn't a registered MIME type/extension that
-        # LiveView's accept filter recognizes; we validate the extension in the handler.
         allow_upload(socket, :rom,
-          accept: :any,
+          accept: ["application/x-nes-rom", ".nes"],
           max_entries: 1,
           auto_upload: true,
           progress: &handle_rom_progress/3
@@ -115,55 +109,48 @@ defmodule BeamicomPhxWeb.WatchLive do
 
   # A dropped/selected .nes finished uploading: copy it out of the temp dir and
   # (re)load the emulator. All viewers pick up the new game via the shared Output.
+  defp handle_rom_progress(:rom, %{done?: false}, socket), do: {:noreply, socket}
+
   defp handle_rom_progress(:rom, entry, socket) do
     name = entry.client_name || ""
+    dest = Path.join(System.tmp_dir!(), "beamicom_current_rom.nes")
 
-    cond do
-      not entry.done? ->
-        {:noreply, socket}
+    path =
+      consume_uploaded_entry(socket, entry, fn %{path: tmp} ->
+        File.cp!(tmp, dest)
+        {:ok, dest}
+      end)
 
-      not String.ends_with?(String.downcase(name), ".nes") ->
-        socket =
-          socket
-          |> cancel_upload(:rom, entry.ref)
-          |> put_flash(:error, "#{name} is not a .nes ROM")
+    socket =
+      case BeamicomPhx.Emulator.load(path) do
+        :ok -> assign(socket, rom_name: name)
+        {:error, _reason} -> put_flash(socket, :error, "Couldn't load #{name}")
+      end
 
-        {:noreply, socket}
-
-      true ->
-        path =
-          consume_uploaded_entry(socket, entry, fn %{path: tmp} ->
-            dest = Path.join(System.tmp_dir!(), "beamicom_current_rom.nes")
-            File.cp!(tmp, dest)
-            {:ok, dest}
-          end)
-
-        socket =
-          case BeamicomPhx.Emulator.load(path) do
-            :ok -> assign(socket, rom_name: name)
-            {:error, _reason} -> put_flash(socket, :error, "Couldn't load #{name}")
-          end
-
-        {:noreply, socket}
-    end
+    File.rm(dest)
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("keydown", %{"key" => key}, socket),
-    do: {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :down, key))}
+  def handle_event("keydown", %{"key" => key}, socket) do
+    {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :down, key))}
+  end
 
-  def handle_event("keyup", %{"key" => key}, socket),
-    do: {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :up, key))}
+  def handle_event("keyup", %{"key" => key}, socket) do
+    {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :up, key))}
+  end
 
   # On-screen controller (pointer down/up via the Gamepad JS hook) — same path as keys.
-  def handle_event("button_down", %{"button" => name}, socket),
-    do: {:noreply, commit(socket, button_event(socket, :down, name))}
+  def handle_event("button_down", %{"button" => name}, socket) do
+    {:noreply, commit(socket, button_event(socket, :down, name))}
+  end
 
-  def handle_event("button_up", %{"button" => name}, socket),
-    do: {:noreply, commit(socket, button_event(socket, :up, name))}
+  def handle_event("button_up", %{"button" => name}, socket) do
+    {:noreply, commit(socket, button_event(socket, :up, name))}
+  end
 
   defp button_event(socket, dir, name) do
     case Input.button_from_name(name) do

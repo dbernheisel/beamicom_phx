@@ -19,102 +19,24 @@
 
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
-// Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
+import Gamepad from "./gamepad"
+import PreventGameKeyScroll from "./prevent_game_key_scroll"
 import {createPlayerHook} from "membrane_webrtc_plugin"
 import {hooks as colocatedHooks} from "phoenix-colocated/beamicom_phx"
 import topbar from "../vendor/topbar"
-
-// Stop arrow keys / space from scrolling the page while playing; the keydown
-// still reaches the server via phx-window-keydown.
-const gameKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "])
-const PreventGameKeyScroll = {
-  mounted() {
-    this.handler = e => { if (gameKeys.has(e.key)) e.preventDefault() }
-    window.addEventListener("keydown", this.handler)
-
-    // The Live.Player <video> ships with `controls`, so when it has focus it
-    // swallows game keys (Enter/Space/arrows) for media shortcuts instead of
-    // letting them bubble to phx-window-keydown. Strip `controls` and make it
-    // unfocusable so every key reaches the emulator input handler. Poll until the
-    // player has rendered the video.
-    const readyVideo = () => {
-      const v = document.getElementById("videoPlayer")
-      if (!v) return false
-      v.removeAttribute("controls")
-      v.tabIndex = -1
-      return true
-    }
-    if (!readyVideo()) {
-      this.videoTimer = setInterval(() => readyVideo() && clearInterval(this.videoTimer), 200)
-    }
-
-    // Browsers block audible autoplay, so the stream starts muted. Unmute on the
-    // first user gesture (a keypress to play counts). Retries until the video exists.
-    this.unmute = () => {
-      const v = document.getElementById("videoPlayer")
-      if (v) {
-        v.muted = false
-        v.volume = 1
-        window.removeEventListener("keydown", this.unmute)
-        window.removeEventListener("pointerdown", this.unmute)
-      }
-    }
-    window.addEventListener("keydown", this.unmute)
-    window.addEventListener("pointerdown", this.unmute)
-  },
-  destroyed() {
-    clearInterval(this.videoTimer)
-    window.removeEventListener("keydown", this.handler)
-    window.removeEventListener("keydown", this.unmute)
-    window.removeEventListener("pointerdown", this.unmute)
-  },
-}
-
-// On-screen NES controller (inlined controller.svg): map SVG element ids to NES
-// buttons; pointer down/up presses/releases via the server (same path as keys).
-// Pointer events unify mouse + touch; capture guarantees the matching "up" so
-// buttons can't stick. The pressed highlight is driven by the server-owned held
-// set, delivered on the container's data-held attribute (keyboard + click alike).
-const SVG_BUTTONS = {
-  path3729: "up", path3731: "down", path2950: "left", path3727: "right",
-  path12005: "a", path12001: "b", rect3789: "select", rect3791: "start",
-}
-const Gamepad = {
-  mounted() {
-    this.byButton = {}
-    for (const [id, button] of Object.entries(SVG_BUTTONS)) {
-      const el = this.el.querySelector("#" + id)
-      if (!el) continue
-      ;(this.byButton[button] ||= []).push(el)
-      el.style.cursor = "pointer"
-      el.style.pointerEvents = "all" // fire even on stroked/unfilled shapes
-      el.addEventListener("pointerdown", e => {
-        e.preventDefault()
-        try { el.setPointerCapture(e.pointerId) } catch (_) {}
-        this.pushEvent("button_down", {button})
-      })
-      const release = () => this.pushEvent("button_up", {button})
-      el.addEventListener("pointerup", release)
-      el.addEventListener("pointercancel", release)
-    }
-    this.applyHeld()
-  },
-  updated() { this.applyHeld() },
-  applyHeld() {
-    const held = new Set((this.el.dataset.held || "").split(" ").filter(Boolean))
-    for (const [button, els] of Object.entries(this.byButton)) {
-      els.forEach(el => el.classList.toggle("is-pressed", held.has(button)))
-    }
-  },
-}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]), PreventGameKeyScroll, Gamepad},
+  hooks: {
+    ...colocatedHooks,
+    Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]),
+    PreventGameKeyScroll,
+    Gamepad
+  },
 })
 
 // Show progress bar on live navigation and form submits
@@ -165,4 +87,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-

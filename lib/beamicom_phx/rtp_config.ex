@@ -9,23 +9,8 @@ defmodule BeamicomPhx.RtpConfig do
   """
 
   @doc "The server's broadcast target as `{ip_tuple, port}`, or nil when unset."
-  def target, do: parse_target(System.get_env("BEAMICOM_RTP_TARGET"))
+  def target, do: Application.get_env(:beamicom_phx, :rtp_target)
 
   @doc "The client's base UDP receive port."
-  def listen_port, do: String.to_integer(System.get_env("BEAMICOM_RTP_LISTEN", "5000"))
-
-  @doc false
-  def parse_target(nil), do: nil
-  def parse_target(""), do: nil
-
-  def parse_target(target) when is_binary(target) do
-    with [host, port] <- String.split(target, ":"),
-         {:ok, ip} <- :inet.parse_address(String.to_charlist(host)),
-         {port, ""} <- Integer.parse(port) do
-      {ip, port}
-    else
-      _ ->
-        raise ArgumentError, "invalid BEAMICOM_RTP_TARGET #{inspect(target)}, expected host:port"
-    end
-  end
+  def listen_port, do: Application.get_env(:beamicom_phx, :rtp_listen)
 end
