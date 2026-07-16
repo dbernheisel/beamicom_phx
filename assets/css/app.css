@@ -246,110 +246,23 @@
   pointer-events: none;
 }
 
-/* ── On-screen NES controller ────────────────────────────────────── */
+/* ── On-screen NES controller (inlined controller.svg) ───────────── */
 .gamepad {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(18px, 4vw, 44px);
-  padding: 16px clamp(18px, 4vw, 34px);
-  border-radius: 12px;
-  background: linear-gradient(180deg, #c9c4b8 0%, #a7a294 100%);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.6),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.35),
-    0 10px 22px rgba(0, 0, 0, 0.5);
+  width: min(88vw, 460px);
+  margin-inline: auto;
   touch-action: none; /* pointer events own the gestures; no scroll/zoom on drag */
   user-select: none;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.55));
 }
 
-.gamepad button {
-  margin: 0;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
+.gamepad svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-/* D-pad: a black cross laid out on a 3×3 grid. */
-.gamepad__dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 24px);
-  grid-template-rows: repeat(3, 24px);
-}
-
-.gamepad__d {
-  background: #1c1c1e;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
-}
-
-.gamepad__d--up {
-  grid-area: 1 / 2;
-  border-radius: 4px 4px 0 0;
-}
-.gamepad__d--left {
-  grid-area: 2 / 1;
-  border-radius: 4px 0 0 4px;
-}
-.gamepad__d--right {
-  grid-area: 2 / 3;
-  border-radius: 0 4px 4px 0;
-}
-.gamepad__d--down {
-  grid-area: 3 / 2;
-  border-radius: 0 0 4px 4px;
-}
-
-.gamepad__d.is-pressed {
-  background: #4b4b50;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
-}
-
-/* Select / Start pills. */
-.gamepad__mid {
-  display: flex;
-  gap: 10px;
-}
-
-.gamepad__pill {
-  width: 44px;
-  height: 14px;
-  border-radius: 8px;
-  background: #3a3a3d;
-  color: #d8d2c4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 7px;
-  letter-spacing: 0.12em;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
-}
-
-.gamepad__pill.is-pressed {
-  background: #d63b2f;
-  color: #fff;
-  transform: translateY(1px);
-}
-
-/* A / B round buttons. */
-.gamepad__ab {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-
-.gamepad__round {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, #e0473a, #a01a1a 70%);
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 700;
-  font-size: 15px;
-  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.35);
-}
-
-.gamepad__round.is-pressed {
-  background: radial-gradient(circle at 38% 32%, #ff7a6e, #c8241c 70%);
-  transform: translateY(2px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.4);
+/* Highlight a pressed button. The Gamepad hook toggles this class on the mapped
+   SVG elements; brightness + glow reads clearly regardless of each shape's fill. */
+.gamepad svg .is-pressed {
+  filter: brightness(1.5) drop-shadow(0 0 4px rgba(255, 240, 120, 0.9));
 }

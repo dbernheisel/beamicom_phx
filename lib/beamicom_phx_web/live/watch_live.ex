@@ -12,6 +12,11 @@ defmodule BeamicomPhxWeb.WatchLive do
   alias BeamicomPhx.Input
   alias Membrane.WebRTC.Live.Player
 
+  # The on-screen controller graphic, inlined so the Gamepad JS hook can reach its
+  # elements by id (mapping in assets/js/app.js). Recompile if the SVG changes.
+  @external_resource "priv/static/controller.svg"
+  @controller_svg File.read!("priv/static/controller.svg")
+
   @impl true
   def mount(_params, _session, socket) do
     mode = Application.get_env(:beamicom_phx, :mode, :server)
@@ -87,41 +92,8 @@ defmodule BeamicomPhxWeb.WatchLive do
         Arrows = D-pad &nbsp;·&nbsp; X = A &nbsp;·&nbsp; Z = B &nbsp;·&nbsp; Enter = Start &nbsp;·&nbsp; Shift = Select
       </p>
 
-      <div id="gamepad" class="gamepad" phx-hook="Gamepad">
-        <div class="gamepad__dpad">
-          <button
-            type="button"
-            data-btn="up"
-            aria-label="Up"
-            class={["gamepad__d gamepad__d--up", pressed(@held, :up)]}
-          ></button>
-          <button
-            type="button"
-            data-btn="left"
-            aria-label="Left"
-            class={["gamepad__d gamepad__d--left", pressed(@held, :left)]}
-          ></button>
-          <button
-            type="button"
-            data-btn="right"
-            aria-label="Right"
-            class={["gamepad__d gamepad__d--right", pressed(@held, :right)]}
-          ></button>
-          <button
-            type="button"
-            data-btn="down"
-            aria-label="Down"
-            class={["gamepad__d gamepad__d--down", pressed(@held, :down)]}
-          ></button>
-        </div>
-        <div class="gamepad__mid">
-          <button type="button" data-btn="select" class={["gamepad__pill", pressed(@held, :select)]}>SELECT</button>
-          <button type="button" data-btn="start" class={["gamepad__pill", pressed(@held, :start)]}>START</button>
-        </div>
-        <div class="gamepad__ab">
-          <button type="button" data-btn="b" class={["gamepad__round", pressed(@held, :b)]}>B</button>
-          <button type="button" data-btn="a" class={["gamepad__round", pressed(@held, :a)]}>A</button>
-        </div>
+      <div id="gamepad" class="gamepad" phx-hook="Gamepad" data-held={held_names(@held)}>
+        {raw(controller_svg())}
       </div>
       <label :if={@mode == :server} class="crt__rom" phx-drop-target={@uploads.rom.ref}>
         <.live_file_input upload={@uploads.rom} class="crt__rom-input" />
@@ -202,6 +174,10 @@ defmodule BeamicomPhxWeb.WatchLive do
     end
   end
 
-  # "is-pressed" for a button currently held (drives the on-screen highlight).
-  defp pressed(held, button), do: if(MapSet.member?(held, button), do: "is-pressed")
+  # Space-joined held button names for the controller's data-held attribute; the
+  # Gamepad hook reads it and highlights the matching SVG elements.
+  defp held_names(held), do: held |> Enum.map(&Atom.to_string/1) |> Enum.join(" ")
+
+  # The inlined controller SVG (compile-time constant, kept out of assigns).
+  defp controller_svg, do: @controller_svg
 end
