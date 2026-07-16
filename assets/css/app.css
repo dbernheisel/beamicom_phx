@@ -267,3 +267,52 @@
 .gamepad svg .is-pressed {
   filter: brightness(1.5) drop-shadow(0 0 4px rgba(255, 240, 120, 0.9));
 }
+
+/* Save state button + gallery of saved share-image PNGs. */
+.save-btn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 1.1rem;
+  border: 1px solid #6f6650;
+  border-radius: 6px;
+  background: #2a2620;
+  color: #d8cfb8;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.save-btn:hover {
+  border-color: #a89a72;
+  background: #352f26;
+}
+
+.save-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  margin: 1.25rem auto 0;
+}
+
+.save-thumb {
+  padding: 4px;
+  border: 1px solid #4a453b;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.save-thumb:hover {
+  border-color: #a89a72;
+}
+
+.save-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border-radius: 4px;
+}

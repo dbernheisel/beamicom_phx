@@ -9,7 +9,7 @@ defmodule BeamicomPhxWeb.WatchLive do
   """
   use BeamicomPhxWeb, :live_view
 
-  alias BeamicomPhx.Input
+  alias BeamicomPhx.{Input, Saves}
   alias Membrane.WebRTC.Live.Player
 
   # The on-screen controller graphic, inlined so the Gamepad JS hook can reach its
@@ -32,6 +32,8 @@ defmodule BeamicomPhxWeb.WatchLive do
           _server ->
             {:ok, _supervisor, _pipeline} =
               Membrane.Pipeline.start_link(BeamicomPhx.AV.Pipeline, egress_signaling: signaling)
+
+            Saves.subscribe()
         end
 
         Player.attach(socket, id: "videoPlayer", signaling: signaling)
@@ -42,7 +44,13 @@ defmodule BeamicomPhxWeb.WatchLive do
     # `held` = controller buttons currently down (the NES controller is stateful, so
     # we resend the whole set on every change). Server mode also accepts a dropped
     # ROM to (re)load the emulator.
-    socket = assign(socket, held: MapSet.new(), mode: mode, rom_name: nil)
+    socket =
+      assign(socket,
+        held: MapSet.new(),
+        mode: mode,
+        rom_name: nil,
+        saves: if(mode == :server, do: Saves.list(), else: [])
+      )
 
     socket =
       if mode == :server do
@@ -103,6 +111,23 @@ defmodule BeamicomPhxWeb.WatchLive do
             else: "Drop a .nes ROM here to load"}
         </label>
       </form>
+
+      <button :if={@mode == :server} type="button" class="save-btn" phx-click="save_state">
+        Save state
+      </button>
+
+      <div :if={@mode == :server and @saves != []} class="save-gallery">
+        <button
+          :for={url <- @saves}
+          type="button"
+          class="save-thumb"
+          phx-click="load_save"
+          phx-value-url={url}
+          title="Load this save"
+        >
+          <img src={url} alt="save state" />
+        </button>
+      </div>
     </div>
     """
   end
@@ -134,6 +159,23 @@ defmodule BeamicomPhxWeb.WatchLive do
   @impl true
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
+  # Capture the live emulator to a new save PNG. The PubSub broadcast refreshes
+  # this and every other viewer's gallery via handle_info(:saves_changed, …).
+  def handle_event("save_state", _params, socket) do
+    case Saves.capture() do
+      {:ok, _url} -> {:noreply, socket}
+      {:error, _reason} -> {:noreply, put_flash(socket, :error, "Nothing to save yet")}
+    end
+  end
+
+  # Load a clicked save into the shared emulator (all viewers follow).
+  def handle_event("load_save", %{"url" => url}, socket) do
+    case Saves.load(url) do
+      :ok -> {:noreply, socket}
+      _ -> {:noreply, put_flash(socket, :error, "Couldn't load that save")}
+    end
+  end
+
   @impl true
   def handle_event("keydown", %{"key" => key}, socket) do
     {:noreply, commit(socket, Input.apply_key(socket.assigns.held, :down, key))}
@@ -151,6 +193,9 @@ defmodule BeamicomPhxWeb.WatchLive do
   def handle_event("button_up", %{"button" => name}, socket) do
     {:noreply, commit(socket, button_event(socket, :up, name))}
   end
+
+  @impl true
+  def handle_info(:saves_changed, socket), do: {:noreply, assign(socket, saves: Saves.list())}
 
   defp button_event(socket, dir, name) do
     case Input.button_from_name(name) do

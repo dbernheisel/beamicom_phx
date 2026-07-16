@@ -23,10 +23,15 @@ defmodule BeamicomPhx.Emulator do
   end
 
   @doc "Stop any running Runtime and start a new one for `rom_path`."
-  def load(rom_path) when is_binary(rom_path) do
+  def load(rom_path) when is_binary(rom_path), do: start(rom: rom_path)
+
+  @doc "Stop any running Runtime and resume from a pre-built console (a loaded save)."
+  def load_console(%Beamicom.NES.Console{} = console), do: start(console: console)
+
+  defp start(opts) do
     stop()
 
-    case DynamicSupervisor.start_child(@sup, {Beamicom.NES.Runtime, rom: rom_path}) do
+    case DynamicSupervisor.start_child(@sup, {Beamicom.NES.Runtime, opts}) do
       {:ok, _pid} -> :ok
       {:error, reason} -> {:error, reason}
     end
