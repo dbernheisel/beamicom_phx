@@ -83,11 +83,31 @@ defmodule BeamicomPhxWeb.WatchLive do
           <div class="crt__bezel">
             <div class="crt__screen">
               <Player.live_render socket={@socket} player_id="videoPlayer" />
+              <canvas
+                id="crt-canvas"
+                phx-hook="Crt"
+                phx-update="ignore"
+                class="crt__glass"
+                aria-hidden="true"
+              ></canvas>
             </div>
           </div>
           <div class="crt__plate">
-            <span class="crt__brand">BEAMICOM</span>
-            <span class="crt__led" aria-hidden="true"></span>
+            <div class="crt__buttons">
+              <button type="button" id="crt-toggle" class="crt__btn">CRT filter: on</button>
+              <button
+                :if={@mode == :server}
+                type="button"
+                class="crt__btn"
+                phx-click="save_state"
+              >
+                Save
+              </button>
+            </div>
+            <div class="crt__badge">
+              <span class="crt__brand">BEAMICOM</span>
+              <span class="crt__led" aria-hidden="true"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -112,10 +132,6 @@ defmodule BeamicomPhxWeb.WatchLive do
             else: "Drop a .nes ROM here to load"}
         </label>
       </form>
-
-      <button :if={@mode == :server} type="button" class="save-btn" phx-click="save_state">
-        Save state
-      </button>
 
       <div :if={@saves != []} class="save-gallery">
         <button

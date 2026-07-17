@@ -23,6 +23,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import Gamepad from "./gamepad"
 import PreventGameKeyScroll from "./prevent_game_key_scroll"
+import Crt from "./crt"
 import {createPlayerHook} from "membrane_webrtc_plugin"
 import {hooks as colocatedHooks} from "phoenix-colocated/beamicom_phx"
 import topbar from "../vendor/topbar"
@@ -35,7 +36,8 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ...colocatedHooks,
     Player: createPlayerHook([{urls: "stun:stun.l.google.com:19302"}]),
     PreventGameKeyScroll,
-    Gamepad
+    Gamepad,
+    Crt
   },
 })
 
