@@ -74,7 +74,6 @@ defmodule BeamicomPhxWeb.WatchLive do
     <div
       id="game"
       phx-hook="PreventGameKeyScroll"
-      phx-window-keydown="keydown"
       phx-window-keyup="keyup"
       class="crt-room"
     >

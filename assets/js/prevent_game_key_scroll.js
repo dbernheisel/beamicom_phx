@@ -4,7 +4,15 @@ const gameKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "
 
 export default {
   mounted() {
-    this.handler = e => { if (gameKeys.has(e.key)) e.preventDefault() }
+    // Send keydown from JS (not phx-window-keydown) so we can drop the OS
+    // auto-repeat: e.repeat is true while a key is held, and the emulator already
+    // has it latched. Still preventDefault repeats so the page doesn't scroll.
+    // keyup stays on phx-window-keyup — it never repeats.
+    this.handler = e => {
+      if (gameKeys.has(e.key)) e.preventDefault()
+      if (e.repeat) return
+      this.pushEvent("keydown", {key: e.key})
+    }
     window.addEventListener("keydown", this.handler)
 
     // The Live.Player <video> ships with `controls`, so when it has focus it
